@@ -37,20 +37,35 @@ async function fetchSource(source: typeof SOURCES[0]) {
   }
 }
 
+const FANCODE_WORKER = "https://fancode-india-sonu.pages.dev/api";
+
 function extractMatches(data: Record<string, unknown>, sourceName: string) {
   const matches = (data.matches || data.channels || data.events || []) as Record<string, unknown>[];
-  return matches.map((m: Record<string, unknown>) => ({
-    id: String(m.contentId || m.match_id || m.id || Math.random()),
-    matchName: String(m.match_name || m.title || m.name || "Unknown Match"),
-    eventName: String(m.event_name || m.tournament || ""),
-    channel: String(m.broadcast_channel || m.channel || sourceName),
-    category: String(m.event_category || m.sport || m.category || "Sports"),
-    language: String(m.audioLanguageName || m.language || "ENG"),
-    thumbnail: String(m.src || m.thumbnail || m.image || m.logo || ""),
-    streamUrl: String(m.video_url || m.adfree_url || m.pub_url || m.dai_url || m.stream_url || ""),
-    isLive: Boolean(m.isLive || m.is_live || String(m.status || "").toUpperCase() === "LIVE"),
-    source: sourceName,
-  })).filter(m => m.streamUrl && m.streamUrl !== "null" && m.streamUrl !== "undefined");
+  return matches.map((m: Record<string, unknown>) => {
+    const matchId = m.match_id || m.contentId || m.id;
+    const language = String(m.language || m.audioLanguageName || "ENGLISH").toUpperCase();
+    const status = String(m.status || "").toUpperCase();
+    const isLive = Boolean(m.isLive || m.is_live || status === "LIVE");
+
+    // For FanCode: build stream URL from worker using match_id
+    let streamUrl = String(m.video_url || m.adfree_url || m.pub_url || m.dai_url || m.stream_url || "");
+    if (sourceName === "FanCode" && matchId && isLive) {
+      streamUrl = `${FANCODE_WORKER}/${matchId}_${language}_sayan.m3u8`;
+    }
+
+    return {
+      id: String(matchId || Math.random()),
+      matchName: String(m.match_name || m.title || m.name || "Unknown Match"),
+      eventName: String(m.event_name || m.tournament || ""),
+      channel: String(m.broadcast_channel || m.channel || sourceName),
+      category: String(m.event_category || m.sport || m.category || "Sports"),
+      language,
+      thumbnail: String(m.src || m.thumbnail || m.image || m.logo || ""),
+      streamUrl,
+      isLive,
+      source: sourceName,
+    };
+  }).filter(m => m.streamUrl && m.streamUrl !== "null" && m.streamUrl !== "undefined" && m.isLive);
 }
 
 export async function GET() {
@@ -75,11 +90,18 @@ export async function GET() {
     }
   }
 
+  // Sort: cricket first, then other sports
+  const cricketFirst = (a: typeof allLive[0], b: typeof allLive[0]) => {
+    const ac = a.category.toLowerCase().includes("cricket") ? 0 : 1;
+    const bc = b.category.toLowerCase().includes("cricket") ? 0 : 1;
+    return ac - bc;
+  };
+
   return NextResponse.json({
     lastUpdated: new Date().toISOString(),
     liveCount: allLive.length,
-    live: allLive,
-    upcoming: allUpcoming.slice(0, 20),
+    live: allLive.sort(cricketFirst),
+    upcoming: allUpcoming.sort(cricketFirst).slice(0, 20),
     sources: sourceStatus,
   });
 }

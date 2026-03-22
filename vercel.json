@@ -1,0 +1,10 @@
+{
+  "functions": {
+    "src/app/api/providers/route.ts": {
+      "maxDuration": 30
+    },
+    "src/app/api/channels/route.ts": {
+      "maxDuration": 30
+    }
+  }
+}

@@ -20,6 +20,7 @@ interface SonyMatch {
   thumbnail: string;
   streamUrl: string | null;
   isLive: boolean;
+  source?: string;
 }
 
 interface SonyData {
@@ -81,7 +82,7 @@ export default function HomePage() {
         {/* Tabs */}
         <div style={{ display: "flex", gap: "2px", marginBottom: "32px", background: "var(--bg2)", border: "1px solid var(--border)", borderRadius: "4px", padding: "3px", flexWrap: "wrap" }}>
           {[
-            { key: "sonyliv", label: `🔴 SONY LIV LIVE${liveCount > 0 ? ` (${liveCount})` : ""}`, sub: "Live match streams, auto-updated" },
+            { key: "sonyliv", label: `🔴 LIVE NOW${liveCount > 0 ? ` (${liveCount})` : ""}`, sub: "SonyLiv · FanCode · Willow — auto-updated" },
             { key: "sports", label: "⚡ SPORTS PROVIDERS", sub: "Pirates TV, CricHD & more" },
             { key: "cricfy", label: "📡 CRICFY", sub: "62 encrypted providers" },
           ].map(tab => (
@@ -231,7 +232,7 @@ function SonyMatchCard({ match }: { match: SonyMatch }) {
             <img src={match.thumbnail} alt={match.matchName} style={{ width: "100%", height: "100%", objectFit: "cover" }}
               onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
             <div style={{ position: "absolute", top: "8px", left: "8px", background: "#ef4444", color: "#fff", fontSize: "9px", fontWeight: 700, padding: "2px 8px", borderRadius: "2px", fontFamily: "var(--font)", letterSpacing: "0.1em" }}>
-              ● LIVE
+              {match.source || "LIVE"} ● LIVE
             </div>
           </div>
         )}

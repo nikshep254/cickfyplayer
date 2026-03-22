@@ -1,7 +1,7 @@
 // src/app/api/daddylive/route.ts
 import { NextResponse } from "next/server";
 
-const PLAYLIST_URL = "https://bit.ly/ddy-m3u1";
+const PLAYLIST_URL = "https://raw.githubusercontent.com/dtankdempse/daddylive-m3u/refs/heads/main/playlist.m3u8";
 const REFERER = "https://lewblivehdplay.ru/";
 const USER_AGENT = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_6_0 like Mac OS X) AppleWebKit/605.2.10 (KHTML, like Gecko) Version/17.6.0 Mobile/16F152 Safari/605.2";
 

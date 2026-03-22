@@ -11,6 +11,7 @@ const CUSTOM_HEADERS = {
 
 export async function GET(req: NextRequest) {
   const url = req.nextUrl.searchParams.get("url");
+  const debug = req.nextUrl.searchParams.get("debug") === "1";
 
   if (!url || !url.startsWith("http")) {
     return NextResponse.json({ error: "Invalid or missing url param" }, { status: 400 });
@@ -19,20 +20,32 @@ export async function GET(req: NextRequest) {
   try {
     const res = await fetch(url, {
       headers: CUSTOM_HEADERS,
-      next: { revalidate: 3600 },
+      cache: "no-store",
     });
 
     if (!res.ok) {
-      return NextResponse.json({ error: "Failed to fetch M3U" }, { status: 502 });
+      return NextResponse.json({ 
+        error: `Failed to fetch M3U: HTTP ${res.status}`,
+        url 
+      }, { status: 502 });
     }
 
     const raw = await res.text();
     const decrypted = decryptContent(raw);
     const channels = parseM3U(decrypted);
 
+    if (debug) {
+      return NextResponse.json({
+        channels,
+        raw_preview: raw.slice(0, 800),
+        decrypted_preview: decrypted.slice(0, 800),
+        channel_count: channels.length,
+      });
+    }
+
     return NextResponse.json({ channels });
   } catch (e) {
     console.error("[api/channels]", e);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return NextResponse.json({ error: String(e) }, { status: 500 });
   }
 }

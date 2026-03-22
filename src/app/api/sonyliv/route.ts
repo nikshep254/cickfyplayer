@@ -1,34 +1,18 @@
 // src/app/api/sonyliv/route.ts
-// Fetches live SonyLiv match stream URLs from auto-updated GitHub repo
-// Source updates every 7 minutes with fresh hdnea tokens
-
 import { NextResponse } from "next/server";
 
-// Primary source — drmlive (original)
-const PRIMARY_URL = "https://raw.githubusercontent.com/drmlive/sliv-live-events/refs/heads/main/sonyliv.json";
-// Mirror — kajju027 (synced every 7 min)
-const MIRROR_URL = "https://raw.githubusercontent.com/kajju027/SonyLiv-Events-Json/refs/heads/main/sonyliv.json";
-
+const PRIMARY = "https://raw.githubusercontent.com/drmlive/sliv-live-events/refs/heads/main/sonyliv.json";
+const MIRROR  = "https://raw.githubusercontent.com/kajju027/SonyLiv-Events-Json/refs/heads/main/sonyliv.json";
 const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36";
 
-interface SonyMatch {
-  event_category: string;
-  isLive: boolean;
-  contentId: string;
-  src: string;
-  broadcast_channel: string;
-  audioLanguageName: string;
-  event_name: string;
-  match_name: string;
-  dai_url: string;
-  pub_url: string;
-  video_url: string;
-}
+// No caching — tokens expire, we need freshest data always
+export const revalidate = 0;
+export const dynamic = "force-dynamic";
 
 async function fetchJson(url: string) {
   const res = await fetch(url, {
     headers: { "User-Agent": UA },
-    next: { revalidate: 120 }, // cache 2 min — tokens valid ~hours
+    cache: "no-store",
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
@@ -36,25 +20,18 @@ async function fetchJson(url: string) {
 
 export async function GET() {
   let data;
-
-  // Try primary, fall back to mirror
-  try {
-    data = await fetchJson(PRIMARY_URL);
-  } catch {
-    try {
-      data = await fetchJson(MIRROR_URL);
-    } catch (e) {
-      return NextResponse.json({ error: String(e) }, { status: 500 });
-    }
+  try { data = await fetchJson(PRIMARY); }
+  catch { 
+    try { data = await fetchJson(MIRROR); }
+    catch (e) { return NextResponse.json({ error: String(e) }, { status: 500 }); }
   }
 
-  const matches: SonyMatch[] = data.matches || [];
-  const lastUpdated: string = data["last update time"] || "";
+  const matches = data.matches || [];
+  const lastUpdated = data["last update time"] || "";
 
-  // Only return matches that are live and have a valid stream URL
   const live = matches
-    .filter(m => m.isLive && (m.video_url || m.pub_url || m.dai_url))
-    .map(m => ({
+    .filter((m: Record<string, unknown>) => m.isLive && (m.video_url || m.pub_url || m.dai_url))
+    .map((m: Record<string, unknown>) => ({
       id: m.contentId,
       matchName: m.match_name,
       eventName: m.event_name,
@@ -63,13 +40,12 @@ export async function GET() {
       language: m.audioLanguageName,
       thumbnail: m.src,
       streamUrl: m.video_url || m.pub_url || m.dai_url,
-      isLive: m.isLive,
+      isLive: true,
     }));
 
-  // Also return upcoming (not live but have future match info)
   const upcoming = matches
-    .filter(m => !m.isLive && m.match_name)
-    .map(m => ({
+    .filter((m: Record<string, unknown>) => !m.isLive && m.match_name)
+    .map((m: Record<string, unknown>) => ({
       id: m.contentId,
       matchName: m.match_name,
       eventName: m.event_name,
@@ -81,10 +57,7 @@ export async function GET() {
       isLive: false,
     }));
 
-  return NextResponse.json({
-    lastUpdated,
-    liveCount: live.length,
-    live,
-    upcoming,
-  });
+  return NextResponse.json({ lastUpdated, liveCount: live.length, live, upcoming },
+    { headers: { "Cache-Control": "no-store, max-age=0" } }
+  );
 }

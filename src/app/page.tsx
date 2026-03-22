@@ -10,31 +10,51 @@ interface Provider {
   catLink: string;
 }
 
+interface SonyMatch {
+  id: string;
+  matchName: string;
+  eventName: string;
+  channel: string;
+  category: string;
+  language: string;
+  thumbnail: string;
+  streamUrl: string | null;
+  isLive: boolean;
+}
+
+interface SonyData {
+  lastUpdated: string;
+  liveCount: number;
+  live: SonyMatch[];
+  upcoming: SonyMatch[];
+}
+
 export default function HomePage() {
   const [cricfyProviders, setCricfyProviders] = useState<Provider[]>([]);
   const [sportsProviders, setSportsProviders] = useState<Provider[]>([]);
+  const [sonyData, setSonyData] = useState<SonyData | null>(null);
   const [loadingCricfy, setLoadingCricfy] = useState(true);
   const [loadingSports, setLoadingSports] = useState(true);
+  const [loadingSony, setLoadingSony] = useState(true);
   const [cricfySearch, setCricfySearch] = useState("");
   const [sportsSearch, setSportsSearch] = useState("");
-  const [activeTab, setActiveTab] = useState<"sports" | "cricfy">("sports");
+  const [activeTab, setActiveTab] = useState<"sonyliv" | "sports" | "cricfy">("sonyliv");
 
   useEffect(() => {
-    // Fetch Cricfy providers (Firebase-based, encrypted)
     fetch("/api/providers")
       .then(r => r.json())
-      .then(d => {
-        if (!d.error) setCricfyProviders(d.providers.filter((p: Provider) => p.catLink?.startsWith("http")));
-      })
+      .then(d => { if (!d.error) setCricfyProviders(d.providers.filter((p: Provider) => p.catLink?.startsWith("http"))); })
       .finally(() => setLoadingCricfy(false));
 
-    // Fetch sports providers (direct M3U, no encryption)
     fetch("/api/daddylive")
       .then(r => r.json())
-      .then(d => {
-        if (!d.error) setSportsProviders(d.providers);
-      })
+      .then(d => { if (!d.error) setSportsProviders(d.providers); })
       .finally(() => setLoadingSports(false));
+
+    fetch("/api/sonyliv")
+      .then(r => r.json())
+      .then(d => { if (!d.error) setSonyData(d); })
+      .finally(() => setLoadingSony(false));
   }, []);
 
   const filteredCricfy = cricfyProviders.filter(p =>
@@ -43,6 +63,8 @@ export default function HomePage() {
   const filteredSports = sportsProviders.filter(p =>
     p.title.toLowerCase().includes(sportsSearch.toLowerCase())
   );
+
+  const liveCount = sonyData?.liveCount || 0;
 
   return (
     <>
@@ -57,12 +79,13 @@ export default function HomePage() {
         </div>
 
         {/* Tabs */}
-        <div style={{ display: "flex", gap: "2px", marginBottom: "32px", background: "var(--bg2)", border: "1px solid var(--border)", borderRadius: "4px", padding: "3px", width: "fit-content" }}>
+        <div style={{ display: "flex", gap: "2px", marginBottom: "32px", background: "var(--bg2)", border: "1px solid var(--border)", borderRadius: "4px", padding: "3px", flexWrap: "wrap" }}>
           {[
-            { key: "sports", label: "⚡ SPORTS (RECOMMENDED)", sub: "Jio, Sony, Hotstar, Cricket HD" },
-            { key: "cricfy", label: "📡 CRICFY PROVIDERS", sub: "62 encrypted providers" },
+            { key: "sonyliv", label: `🔴 SONY LIV LIVE${liveCount > 0 ? ` (${liveCount})` : ""}`, sub: "Live match streams, auto-updated" },
+            { key: "sports", label: "⚡ SPORTS PROVIDERS", sub: "Pirates TV, CricHD & more" },
+            { key: "cricfy", label: "📡 CRICFY", sub: "62 encrypted providers" },
           ].map(tab => (
-            <button key={tab.key} onClick={() => setActiveTab(tab.key as "sports" | "cricfy")}
+            <button key={tab.key} onClick={() => setActiveTab(tab.key as typeof activeTab)}
               style={{
                 background: activeTab === tab.key ? "var(--accent)" : "transparent",
                 color: activeTab === tab.key ? "#000" : "var(--text2)",
@@ -77,13 +100,66 @@ export default function HomePage() {
           ))}
         </div>
 
-        {/* Sports tab */}
+        {/* SONYLIV TAB */}
+        {activeTab === "sonyliv" && (
+          <div>
+            {loadingSony ? <Spinner label="FETCHING LIVE MATCHES" /> : (
+              <>
+                {sonyData && (
+                  <p style={{ fontSize: "9px", color: "var(--text3)", marginBottom: "20px", letterSpacing: "0.1em" }}>
+                    LAST UPDATED {sonyData.lastUpdated} · AUTO-REFRESHES EVERY 7 MIN
+                  </p>
+                )}
+
+                {/* Live now */}
+                {sonyData && sonyData.live.length > 0 && (
+                  <div style={{ marginBottom: "40px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "16px" }}>
+                      <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#ef4444", display: "inline-block", boxShadow: "0 0 8px #ef4444", animation: "pulse 2s infinite" }} />
+                      <p style={{ fontSize: "11px", color: "var(--text)", fontWeight: 700, letterSpacing: "0.1em" }}>LIVE NOW</p>
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "12px" }}>
+                      {sonyData.live.map(match => (
+                        <SonyMatchCard key={match.id} match={match} />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Upcoming */}
+                {sonyData && sonyData.upcoming.length > 0 && (
+                  <div>
+                    <p style={{ fontSize: "10px", color: "var(--text3)", letterSpacing: "0.2em", marginBottom: "12px" }}>UPCOMING / OFF AIR</p>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: "8px" }}>
+                      {sonyData.upcoming.filter(m => m.matchName).map(match => (
+                        <div key={match.id} style={{ background: "var(--bg2)", border: "1px solid var(--border)", borderRadius: "4px", padding: "12px 16px", opacity: 0.6 }}>
+                          <p style={{ fontSize: "11px", color: "var(--text)", marginBottom: "4px" }}>{match.matchName}</p>
+                          <p style={{ fontSize: "9px", color: "var(--text3)", letterSpacing: "0.1em" }}>{match.channel} · {match.category}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {sonyData && sonyData.live.length === 0 && (
+                  <div style={{ textAlign: "center", padding: "60px 0" }}>
+                    <p style={{ fontSize: "32px", marginBottom: "12px" }}>📡</p>
+                    <p style={{ fontSize: "12px", color: "var(--text)", marginBottom: "8px" }}>No live matches right now</p>
+                    <p style={{ fontSize: "10px", color: "var(--text3)" }}>Check back when a match is scheduled</p>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
+
+        {/* SPORTS TAB */}
         {activeTab === "sports" && (
           <div>
             <div style={{ marginBottom: "20px", display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: "12px" }}>
               <div>
-                <p style={{ fontSize: "13px", fontWeight: 600, color: "var(--text)", marginBottom: "4px" }}>Direct Stream Providers</p>
-                <p style={{ fontSize: "10px", color: "var(--text3)" }}>Jio, Sony, Hotstar, Cricket HD — same sources as the Cricfy app</p>
+                <p style={{ fontSize: "13px", fontWeight: 600, color: "var(--text)", marginBottom: "4px" }}>Sports Stream Providers</p>
+                <p style={{ fontSize: "10px", color: "var(--text3)" }}>Star Sports, Sony Ten, T Sports and more via Pirates TV & CricHD</p>
               </div>
               <input type="text" placeholder="search providers..." value={sportsSearch}
                 onChange={e => setSportsSearch(e.target.value)}
@@ -91,21 +167,16 @@ export default function HomePage() {
                 onFocus={e => e.target.style.borderColor = "var(--accent)"}
                 onBlur={e => e.target.style.borderColor = "var(--border)"} />
             </div>
-
-            {loadingSports ? (
-              <Spinner label="LOADING PROVIDERS" />
-            ) : (
+            {loadingSports ? <Spinner label="LOADING PROVIDERS" /> : (
               <>
-                <p style={{ fontSize: "10px", color: "var(--text3)", marginBottom: "16px", letterSpacing: "0.1em" }}>
-                  {filteredSports.length} PROVIDERS
-                </p>
+                <p style={{ fontSize: "10px", color: "var(--text3)", marginBottom: "16px", letterSpacing: "0.1em" }}>{filteredSports.length} PROVIDERS</p>
                 <ProviderGrid providers={filteredSports} />
               </>
             )}
           </div>
         )}
 
-        {/* Cricfy tab */}
+        {/* CRICFY TAB */}
         {activeTab === "cricfy" && (
           <div>
             <div style={{ marginBottom: "20px" }}>
@@ -115,14 +186,9 @@ export default function HomePage() {
                 onFocus={e => e.target.style.borderColor = "var(--accent)"}
                 onBlur={e => e.target.style.borderColor = "var(--border)"} />
             </div>
-
-            {loadingCricfy ? (
-              <Spinner label="FETCHING PROVIDERS" />
-            ) : (
+            {loadingCricfy ? <Spinner label="FETCHING PROVIDERS" /> : (
               <>
-                <p style={{ fontSize: "10px", color: "var(--text3)", marginBottom: "16px", letterSpacing: "0.1em" }}>
-                  {filteredCricfy.length} PROVIDERS
-                </p>
+                <p style={{ fontSize: "10px", color: "var(--text3)", marginBottom: "16px", letterSpacing: "0.1em" }}>{filteredCricfy.length} PROVIDERS</p>
                 <ProviderGrid providers={filteredCricfy} />
               </>
             )}
@@ -131,8 +197,54 @@ export default function HomePage() {
 
       </main>
       <Footer />
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      <style>{`
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+      `}</style>
     </>
+  );
+}
+
+function SonyMatchCard({ match }: { match: SonyMatch }) {
+  const [hovered, setHovered] = useState(false);
+  const params = encodeURIComponent(JSON.stringify({
+    url: match.streamUrl,
+    name: match.matchName,
+    referer: "https://www.sonyliv.com",
+    userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+    logo: match.thumbnail,
+    group: match.category,
+  }));
+
+  return (
+    <Link href={`/play?ch=${params}`}>
+      <div onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
+        style={{
+          background: hovered ? "var(--card-hover)" : "var(--bg2)",
+          border: `1px solid ${hovered ? "var(--accent)" : "var(--border)"}`,
+          borderRadius: "4px", overflow: "hidden", cursor: "pointer",
+          transition: "all 0.15s",
+        }}>
+        {/* Thumbnail */}
+        {match.thumbnail && (
+          <div style={{ position: "relative", aspectRatio: "16/9", background: "var(--bg3)", overflow: "hidden" }}>
+            <img src={match.thumbnail} alt={match.matchName} style={{ width: "100%", height: "100%", objectFit: "cover" }}
+              onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
+            <div style={{ position: "absolute", top: "8px", left: "8px", background: "#ef4444", color: "#fff", fontSize: "9px", fontWeight: 700, padding: "2px 8px", borderRadius: "2px", fontFamily: "var(--font)", letterSpacing: "0.1em" }}>
+              ● LIVE
+            </div>
+          </div>
+        )}
+        <div style={{ padding: "12px" }}>
+          <p style={{ fontSize: "12px", fontWeight: 600, color: "var(--text)", marginBottom: "4px", lineHeight: 1.4 }}>{match.matchName}</p>
+          <p style={{ fontSize: "10px", color: "var(--text2)", marginBottom: "6px" }}>{match.eventName}</p>
+          <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
+            <span style={{ fontSize: "9px", background: "var(--bg3)", color: "var(--text3)", padding: "2px 8px", borderRadius: "2px", letterSpacing: "0.1em" }}>{match.channel}</span>
+            <span style={{ fontSize: "9px", color: "var(--text3)", letterSpacing: "0.1em" }}>{match.category} · {match.language}</span>
+          </div>
+        </div>
+      </div>
+    </Link>
   );
 }
 
@@ -158,9 +270,8 @@ function ProviderGrid({ providers }: { providers: Provider[] }) {
 
 function ProviderCard({ provider }: { provider: Provider }) {
   const [hovered, setHovered] = useState(false);
-  const url = `/watch?url=${encodeURIComponent(provider.catLink)}&name=${encodeURIComponent(provider.title)}`;
   return (
-    <Link href={url}>
+    <Link href={`/watch?url=${encodeURIComponent(provider.catLink)}&name=${encodeURIComponent(provider.title)}`}>
       <div onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
         style={{ background: hovered ? "var(--card-hover)" : "var(--bg)", padding: "18px", display: "flex", alignItems: "center", gap: "14px", cursor: "pointer", transition: "background 0.1s", minHeight: "68px" }}>
         <div style={{ width: "36px", height: "36px", flexShrink: 0, background: "var(--bg3)", borderRadius: "3px", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>

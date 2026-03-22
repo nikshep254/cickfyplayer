@@ -27,8 +27,10 @@ function getKeys(): KeyInfo[] {
 }
 
 function tryDecrypt(ciphertext: Buffer, keyInfo: KeyInfo): string | null {
+  // Auto-detect AES-128 vs AES-256 based on key length
+  const alg = keyInfo.key.length === 16 ? "aes-128-cbc" : "aes-256-cbc";
   try {
-    const decipher = crypto.createDecipheriv("aes-256-cbc", keyInfo.key, keyInfo.iv);
+    const decipher = crypto.createDecipheriv(alg, keyInfo.key, keyInfo.iv);
     decipher.setAutoPadding(true);
     const decrypted = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
     const text = decrypted.toString("utf-8");
@@ -80,9 +82,11 @@ export function decryptContent(content: string): string {
 
     const iv = Buffer.from(ivBase64, "base64");
     const key = Buffer.from(keyBase64, "base64");
+    // Auto-detect algorithm based on key length
+    const alg = key.length === 16 ? "aes-128-cbc" : "aes-256-cbc";
     const encryptedBytes = Buffer.from(encryptedDataStr, "base64");
 
-    const decipher = crypto.createDecipheriv("aes-256-cbc", key, iv);
+    const decipher = crypto.createDecipheriv(alg, key, iv);
     decipher.setAutoPadding(true);
     const decrypted = Buffer.concat([decipher.update(encryptedBytes), decipher.final()]);
     return decrypted.toString("utf-8");

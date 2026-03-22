@@ -1,104 +1,66 @@
 // src/app/api/daddylive/route.ts
 import { NextResponse } from "next/server";
 
-const PLAYLIST_URL = "https://raw.githubusercontent.com/dtankdempse/daddylive-m3u/refs/heads/main/playlist.m3u8";
-const REFERER = "https://lewblivehdplay.ru/";
-const USER_AGENT = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_6_0 like Mac OS X) AppleWebKit/605.2.10 (KHTML, like Gecko) Version/17.6.0 Mobile/16F152 Safari/605.2";
+export const revalidate = 3600; // cache 1hr
 
-// Keywords to filter sports/cricket channels
-const SPORTS_KEYWORDS = [
-  "cricket", "star sports", "willow", "sky sports", "espn", "sony",
-  "ten ", "ten1", "ten2", "ten3", "fox sports", "bt sport", "tnt sports",
-  "eurosport", "dazn", "supersport", "sport", "ptv sports", "geo super",
-  "a sports", "dsport", "fancode", "jio", "sonyliv"
+const REFERER = "https://lewblivehdplay.ru/";
+const UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_6_0 like Mac OS X) AppleWebKit/605.2.10 (KHTML, like Gecko) Version/17.6.0 Mobile/16F152 Safari/605.2";
+const BASE = "https://xyzdddd.mizhls.ru/lb";
+
+// Hardcoded cricket/sports channels from DaddyLive
+// Source: dlhd.so channel list — these IDs are stable
+const CHANNELS = [
+  // Cricket
+  { name: "Willow Cricket HD", group: "Cricket", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/6/69/Willow_TV_logo.svg/200px-Willow_TV_logo.svg.png", id: 215 },
+  { name: "Star Sports 1 HD", group: "Cricket", logo: "https://upload.wikimedia.org/wikipedia/en/thumb/3/3d/Star_Sports_1_logo.svg/200px-Star_Sports_1_logo.svg.png", id: 503 },
+  { name: "Star Sports 2 HD", group: "Cricket", logo: "https://upload.wikimedia.org/wikipedia/en/thumb/8/8c/Star_Sports_2_logo.svg/200px-Star_Sports_2_logo.svg.png", id: 504 },
+  { name: "Star Sports 1 Hindi", group: "Cricket", logo: "https://upload.wikimedia.org/wikipedia/en/3/3d/Star_Sports_1_logo.svg", id: 505 },
+  { name: "Star Sports 3", group: "Cricket", logo: "", id: 506 },
+  { name: "Sky Sports Cricket HD", group: "Cricket", logo: "https://upload.wikimedia.org/wikipedia/en/thumb/9/98/Sky_Sports_Cricket_2020.png/200px-Sky_Sports_Cricket_2020.png", id: 56 },
+  { name: "Sky Sports Main Event", group: "Cricket", logo: "https://upload.wikimedia.org/wikipedia/en/thumb/1/13/Sky_Sports_Main_Event_2020.png/200px-Sky_Sports_Main_Event_2020.png", id: 55 },
+  { name: "A Sports HD", group: "Cricket", logo: "", id: 519 },
+  { name: "PTV Sports", group: "Cricket", logo: "https://upload.wikimedia.org/wikipedia/en/thumb/e/ef/PTV_Sports.png/200px-PTV_Sports.png", id: 388 },
+  { name: "Geo Super", group: "Cricket", logo: "https://upload.wikimedia.org/wikipedia/en/thumb/0/0a/Geo_Super.png/200px-Geo_Super.png", id: 389 },
+  { name: "DSport", group: "Cricket", logo: "", id: 507 },
+  { name: "Ten 1 HD", group: "Cricket", logo: "", id: 497 },
+  { name: "Ten 2 HD", group: "Cricket", logo: "", id: 498 },
+  { name: "Ten 3 HD", group: "Cricket", logo: "", id: 499 },
+  { name: "Fancode", group: "Cricket", logo: "", id: 554 },
+  // Football
+  { name: "Sky Sports Football HD", group: "Football", logo: "https://upload.wikimedia.org/wikipedia/en/thumb/c/c7/Sky_Sports_Football_2020.png/200px-Sky_Sports_Football_2020.png", id: 57 },
+  { name: "Sky Sports Premier League HD", group: "Football", logo: "https://upload.wikimedia.org/wikipedia/en/thumb/5/56/Sky_Sports_Premier_League_2020.png/200px-Sky_Sports_Premier_League_2020.png", id: 60 },
+  { name: "TNT Sports 1 HD", group: "Football", logo: "", id: 74 },
+  { name: "TNT Sports 2 HD", group: "Football", logo: "", id: 75 },
+  { name: "TNT Sports 3 HD", group: "Football", logo: "", id: 76 },
+  { name: "TNT Sports 4 HD", group: "Football", logo: "", id: 77 },
+  { name: "beIN Sports 1 HD", group: "Football", logo: "", id: 366 },
+  { name: "beIN Sports 2 HD", group: "Football", logo: "", id: 367 },
+  { name: "ESPN USA", group: "Football", logo: "", id: 151 },
+  { name: "ESPN2 USA", group: "Football", logo: "", id: 152 },
+  // Multi-sport
+  { name: "Sky Sports Action HD", group: "Sports", logo: "", id: 58 },
+  { name: "Sky Sports Arena HD", group: "Sports", logo: "", id: 59 },
+  { name: "Eurosport 1 HD", group: "Sports", logo: "", id: 95 },
+  { name: "Eurosport 2 HD", group: "Sports", logo: "", id: 96 },
+  { name: "Fox Sports 1 USA", group: "Sports", logo: "", id: 156 },
+  { name: "Fox Sports 2 USA", group: "Sports", logo: "", id: 157 },
+  { name: "SuperSport Cricket", group: "Cricket", logo: "", id: 430 },
+  { name: "SuperSport Rugby", group: "Sports", logo: "", id: 431 },
+  { name: "DAZN 1 HD", group: "Sports", logo: "", id: 358 },
+  { name: "DAZN 2 HD", group: "Sports", logo: "", id: 359 },
 ];
 
-function isSportsChannel(name: string, group: string): boolean {
-  const lower = (name + " " + group).toLowerCase();
-  return SPORTS_KEYWORDS.some(k => lower.includes(k));
-}
-
-function parseM3UPlaylist(content: string) {
-  const lines = content.split("\n");
-  const channels: {
-    name: string;
-    logo: string;
-    group: string;
-    url: string;
-    referer: string;
-    userAgent: string;
-  }[] = [];
-
-  let currentInfo: { name: string; logo: string; group: string } | null = null;
-
-  for (const rawLine of lines) {
-    const line = rawLine.trim();
-    if (!line) continue;
-
-    if (line.startsWith("#EXTINF")) {
-      // Extract attributes
-      const logoMatch = line.match(/tvg-logo="([^"]*)"/);
-      const groupMatch = line.match(/group-title="([^"]*)"/);
-      const nameMatch = line.split(",").pop()?.trim() || "Unknown";
-
-      currentInfo = {
-        name: nameMatch,
-        logo: logoMatch?.[1] || "",
-        group: groupMatch?.[1] || "",
-      };
-    } else if (!line.startsWith("#") && currentInfo) {
-      channels.push({
-        name: currentInfo.name,
-        logo: currentInfo.logo,
-        group: currentInfo.group,
-        url: line,
-        referer: REFERER,
-        userAgent: USER_AGENT,
-      });
-      currentInfo = null;
-    }
-  }
-
-  return channels;
-}
-
 export async function GET() {
-  try {
-    const res = await fetch(PLAYLIST_URL, {
-      headers: {
-        "User-Agent": USER_AGENT,
-        "Referer": REFERER,
-      },
-      next: { revalidate: 1800 }, // cache 30 min
-    });
+  const channels = CHANNELS.map(ch => ({
+    name: ch.name,
+    group: ch.group,
+    logo: ch.logo,
+    url: `${BASE}/premium${ch.id}/index.m3u8`,
+    referer: REFERER,
+    userAgent: UA,
+  }));
 
-    if (!res.ok) {
-      return NextResponse.json({ error: "Failed to fetch DaddyLive playlist" }, { status: 502 });
-    }
+  const groups = [...new Set(channels.map(c => c.group))];
 
-    const text = await res.text();
-    const allChannels = parseM3UPlaylist(text);
-
-    // Filter to sports only
-    const sportsChannels = allChannels.filter(ch =>
-      isSportsChannel(ch.name, ch.group)
-    );
-
-    // Group them
-    const grouped: Record<string, typeof sportsChannels> = {};
-    for (const ch of sportsChannels) {
-      const g = ch.group || "Other";
-      if (!grouped[g]) grouped[g] = [];
-      grouped[g].push(ch);
-    }
-
-    return NextResponse.json({
-      total: sportsChannels.length,
-      channels: sportsChannels,
-      groups: Object.keys(grouped),
-    });
-  } catch (e) {
-    console.error("[api/daddylive]", e);
-    return NextResponse.json({ error: String(e) }, { status: 500 });
-  }
+  return NextResponse.json({ total: channels.length, channels, groups });
 }

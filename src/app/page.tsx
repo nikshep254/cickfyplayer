@@ -10,216 +10,120 @@ interface Provider {
   catLink: string;
 }
 
-interface DaddyChannel {
-  name: string;
-  logo: string;
-  group: string;
-  url: string;
-  referer: string;
-  userAgent: string;
-}
-
 export default function HomePage() {
-  const [providers, setProviders] = useState<Provider[]>([]);
-  const [loadingProviders, setLoadingProviders] = useState(true);
-  const [providerError, setProviderError] = useState("");
-  const [providerSearch, setProviderSearch] = useState("");
-
-  const [daddyChannels, setDaddyChannels] = useState<DaddyChannel[]>([]);
-  const [loadingDaddy, setLoadingDaddy] = useState(true);
-  const [daddyError, setDaddyError] = useState("");
-  const [daddySearch, setDaddySearch] = useState("");
-
-  const [activeTab, setActiveTab] = useState<"daddy" | "cricfy">("daddy");
+  const [cricfyProviders, setCricfyProviders] = useState<Provider[]>([]);
+  const [sportsProviders, setSportsProviders] = useState<Provider[]>([]);
+  const [loadingCricfy, setLoadingCricfy] = useState(true);
+  const [loadingSports, setLoadingSports] = useState(true);
+  const [cricfySearch, setCricfySearch] = useState("");
+  const [sportsSearch, setSportsSearch] = useState("");
+  const [activeTab, setActiveTab] = useState<"sports" | "cricfy">("sports");
 
   useEffect(() => {
+    // Fetch Cricfy providers (Firebase-based, encrypted)
     fetch("/api/providers")
       .then(r => r.json())
       .then(d => {
-        if (d.error) setProviderError(d.error);
-        else setProviders(d.providers.filter((p: Provider) => p.catLink?.startsWith("http")));
+        if (!d.error) setCricfyProviders(d.providers.filter((p: Provider) => p.catLink?.startsWith("http")));
       })
-      .catch(() => setProviderError("Failed to load"))
-      .finally(() => setLoadingProviders(false));
+      .finally(() => setLoadingCricfy(false));
 
+    // Fetch sports providers (direct M3U, no encryption)
     fetch("/api/daddylive")
       .then(r => r.json())
       .then(d => {
-        if (d.error) setDaddyError(d.error);
-        else setDaddyChannels(d.channels);
+        if (!d.error) setSportsProviders(d.providers);
       })
-      .catch(() => setDaddyError("Failed to load DaddyLive"))
-      .finally(() => setLoadingDaddy(false));
+      .finally(() => setLoadingSports(false));
   }, []);
 
-  const filteredProviders = providers.filter(p =>
-    p.title.toLowerCase().includes(providerSearch.toLowerCase())
+  const filteredCricfy = cricfyProviders.filter(p =>
+    p.title.toLowerCase().includes(cricfySearch.toLowerCase())
   );
-
-  const filteredDaddy = daddyChannels.filter(ch =>
-    ch.name.toLowerCase().includes(daddySearch.toLowerCase()) ||
-    ch.group.toLowerCase().includes(daddySearch.toLowerCase())
+  const filteredSports = sportsProviders.filter(p =>
+    p.title.toLowerCase().includes(sportsSearch.toLowerCase())
   );
-
-  // Group daddy channels
-  const daddyGroups = filteredDaddy.reduce((acc, ch) => {
-    const g = ch.group || "Other";
-    if (!acc[g]) acc[g] = [];
-    acc[g].push(ch);
-    return acc;
-  }, {} as Record<string, DaddyChannel[]>);
 
   return (
     <>
       <Navbar />
       <main style={{ maxWidth: "1200px", margin: "0 auto", padding: "40px 24px" }}>
 
-        {/* Hero */}
         <div style={{ marginBottom: "40px" }}>
-          <p style={{ fontSize: "10px", letterSpacing: "0.3em", color: "var(--text3)", marginBottom: "12px" }}>
-            LIVE CRICKET & SPORTS
-          </p>
+          <p style={{ fontSize: "10px", letterSpacing: "0.3em", color: "var(--text3)", marginBottom: "12px" }}>LIVE CRICKET & SPORTS</p>
           <h1 style={{ fontSize: "clamp(28px, 5vw, 52px)", fontWeight: 700, letterSpacing: "-0.02em", lineHeight: 1.1 }}>
             WATCH LIVE<br /><span style={{ color: "var(--accent)" }}>STREAMS</span>
           </h1>
         </div>
 
-        {/* Tab switcher */}
+        {/* Tabs */}
         <div style={{ display: "flex", gap: "2px", marginBottom: "32px", background: "var(--bg2)", border: "1px solid var(--border)", borderRadius: "4px", padding: "3px", width: "fit-content" }}>
           {[
-            { key: "daddy", label: "⚡ SPORTS (WORKS NOW)", desc: "Star Sports, Willow, Sky Sports" },
-            { key: "cricfy", label: "📡 CRICFY PROVIDERS", desc: "62 providers" },
+            { key: "sports", label: "⚡ SPORTS (RECOMMENDED)", sub: "Jio, Sony, Hotstar, Cricket HD" },
+            { key: "cricfy", label: "📡 CRICFY PROVIDERS", sub: "62 encrypted providers" },
           ].map(tab => (
-            <button
-              key={tab.key}
-              onClick={() => setActiveTab(tab.key as "daddy" | "cricfy")}
+            <button key={tab.key} onClick={() => setActiveTab(tab.key as "sports" | "cricfy")}
               style={{
                 background: activeTab === tab.key ? "var(--accent)" : "transparent",
                 color: activeTab === tab.key ? "#000" : "var(--text2)",
-                border: "none",
-                padding: "8px 16px",
-                fontSize: "10px",
-                fontFamily: "var(--font)",
-                fontWeight: activeTab === tab.key ? 700 : 400,
-                letterSpacing: "0.1em",
-                borderRadius: "3px",
-                cursor: "pointer",
-                transition: "all 0.15s",
-                textAlign: "left",
-              }}
-            >
+                border: "none", padding: "8px 16px", fontSize: "10px",
+                fontFamily: "var(--font)", fontWeight: activeTab === tab.key ? 700 : 400,
+                letterSpacing: "0.1em", borderRadius: "3px", cursor: "pointer",
+                transition: "all 0.15s", textAlign: "left",
+              }}>
               <div>{tab.label}</div>
-              <div style={{ fontSize: "8px", opacity: 0.7, marginTop: "2px" }}>{tab.desc}</div>
+              <div style={{ fontSize: "8px", opacity: 0.7, marginTop: "2px" }}>{tab.sub}</div>
             </button>
           ))}
         </div>
 
-        {/* DADDYLIVE TAB */}
-        {activeTab === "daddy" && (
+        {/* Sports tab */}
+        {activeTab === "sports" && (
           <div>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px", flexWrap: "wrap", gap: "12px" }}>
+            <div style={{ marginBottom: "20px", display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: "12px" }}>
               <div>
-                <p style={{ fontSize: "13px", fontWeight: 600, color: "var(--text)", marginBottom: "4px" }}>
-                  Live Sports Channels
-                </p>
-                <p style={{ fontSize: "10px", color: "var(--text3)" }}>
-                  Direct HLS streams — no DRM, plays in browser
-                </p>
+                <p style={{ fontSize: "13px", fontWeight: 600, color: "var(--text)", marginBottom: "4px" }}>Direct Stream Providers</p>
+                <p style={{ fontSize: "10px", color: "var(--text3)" }}>Jio, Sony, Hotstar, Cricket HD — same sources as the Cricfy app</p>
               </div>
-              <input
-                type="text"
-                placeholder="search channels..."
-                value={daddySearch}
-                onChange={e => setDaddySearch(e.target.value)}
-                style={{
-                  background: "var(--bg2)", border: "1px solid var(--border)", color: "var(--text)",
-                  padding: "8px 12px", fontSize: "11px", fontFamily: "var(--font)",
-                  borderRadius: "4px", outline: "none", width: "220px",
-                }}
+              <input type="text" placeholder="search providers..." value={sportsSearch}
+                onChange={e => setSportsSearch(e.target.value)}
+                style={{ background: "var(--bg2)", border: "1px solid var(--border)", color: "var(--text)", padding: "8px 12px", fontSize: "11px", fontFamily: "var(--font)", borderRadius: "4px", outline: "none", width: "220px" }}
                 onFocus={e => e.target.style.borderColor = "var(--accent)"}
-                onBlur={e => e.target.style.borderColor = "var(--border)"}
-              />
+                onBlur={e => e.target.style.borderColor = "var(--border)"} />
             </div>
 
-            {loadingDaddy && (
-              <div style={{ padding: "60px 0", textAlign: "center" }}>
-                <div style={{ width: "24px", height: "24px", border: "2px solid var(--border2)", borderTop: "2px solid var(--accent)", borderRadius: "50%", animation: "spin 0.8s linear infinite", margin: "0 auto 12px" }} />
-                <p style={{ fontSize: "10px", color: "var(--text3)", letterSpacing: "0.2em" }}>LOADING CHANNELS</p>
-              </div>
-            )}
-
-            {daddyError && (
-              <div style={{ border: "1px solid var(--red)", borderRadius: "4px", padding: "16px", background: "rgba(255,64,64,0.05)" }}>
-                <p style={{ fontSize: "11px", color: "var(--red)" }}>ERROR — {daddyError}</p>
-              </div>
-            )}
-
-            {!loadingDaddy && !daddyError && (
-              <div>
-                {Object.entries(daddyGroups).sort().map(([group, channels]) => (
-                  <div key={group} style={{ marginBottom: "32px" }}>
-                    <p style={{ fontSize: "9px", color: "var(--text3)", letterSpacing: "0.25em", marginBottom: "10px", textTransform: "uppercase", borderBottom: "1px solid var(--border)", paddingBottom: "8px" }}>
-                      {group} <span style={{ color: "var(--text3)", fontWeight: 400 }}>({channels.length})</span>
-                    </p>
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: "1px", background: "var(--border)", borderRadius: "4px", overflow: "hidden", border: "1px solid var(--border)" }}>
-                      {channels.map((ch, i) => (
-                        <DaddyChannelCard key={i} channel={ch} />
-                      ))}
-                    </div>
-                  </div>
-                ))}
-                {filteredDaddy.length === 0 && (
-                  <p style={{ fontSize: "11px", color: "var(--text3)", textAlign: "center", padding: "40px" }}>
-                    No channels match "{daddySearch}"
-                  </p>
-                )}
-              </div>
+            {loadingSports ? (
+              <Spinner label="LOADING PROVIDERS" />
+            ) : (
+              <>
+                <p style={{ fontSize: "10px", color: "var(--text3)", marginBottom: "16px", letterSpacing: "0.1em" }}>
+                  {filteredSports.length} PROVIDERS
+                </p>
+                <ProviderGrid providers={filteredSports} />
+              </>
             )}
           </div>
         )}
 
-        {/* CRICFY TAB */}
+        {/* Cricfy tab */}
         {activeTab === "cricfy" && (
           <div>
             <div style={{ marginBottom: "20px" }}>
-              <input
-                type="text"
-                placeholder="filter providers..."
-                value={providerSearch}
-                onChange={e => setProviderSearch(e.target.value)}
-                style={{
-                  background: "var(--bg2)", border: "1px solid var(--border)", color: "var(--text)",
-                  padding: "9px 12px 9px 12px", fontSize: "13px", fontFamily: "var(--font)",
-                  borderRadius: "4px", outline: "none", width: "100%", maxWidth: "420px",
-                }}
+              <input type="text" placeholder="filter providers..." value={cricfySearch}
+                onChange={e => setCricfySearch(e.target.value)}
+                style={{ background: "var(--bg2)", border: "1px solid var(--border)", color: "var(--text)", padding: "9px 12px", fontSize: "13px", fontFamily: "var(--font)", borderRadius: "4px", outline: "none", width: "100%", maxWidth: "420px" }}
                 onFocus={e => e.target.style.borderColor = "var(--accent)"}
-                onBlur={e => e.target.style.borderColor = "var(--border)"}
-              />
+                onBlur={e => e.target.style.borderColor = "var(--border)"} />
             </div>
 
-            {loadingProviders && (
-              <div style={{ padding: "60px 0", textAlign: "center" }}>
-                <div style={{ width: "24px", height: "24px", border: "2px solid var(--border2)", borderTop: "2px solid var(--accent)", borderRadius: "50%", animation: "spin 0.8s linear infinite", margin: "0 auto 12px" }} />
-                <p style={{ fontSize: "10px", color: "var(--text3)", letterSpacing: "0.2em" }}>FETCHING PROVIDERS</p>
-              </div>
-            )}
-
-            {providerError && (
-              <div style={{ border: "1px solid var(--red)", borderRadius: "4px", padding: "16px", background: "rgba(255,64,64,0.05)" }}>
-                <p style={{ fontSize: "11px", color: "var(--red)" }}>ERROR — {providerError}</p>
-              </div>
-            )}
-
-            {!loadingProviders && !providerError && (
+            {loadingCricfy ? (
+              <Spinner label="FETCHING PROVIDERS" />
+            ) : (
               <>
                 <p style={{ fontSize: "10px", color: "var(--text3)", marginBottom: "16px", letterSpacing: "0.1em" }}>
-                  {filteredProviders.length} PROVIDERS
+                  {filteredCricfy.length} PROVIDERS
                 </p>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: "1px", background: "var(--border)", borderRadius: "4px", overflow: "hidden", border: "1px solid var(--border)" }}>
-                  {filteredProviders.map(p => (
-                    <ProviderCard key={p.catLink} provider={p} />
-                  ))}
-                </div>
+                <ProviderGrid providers={filteredCricfy} />
               </>
             )}
           </div>
@@ -232,77 +136,37 @@ export default function HomePage() {
   );
 }
 
-function DaddyChannelCard({ channel }: { channel: DaddyChannel }) {
-  const [hovered, setHovered] = useState(false);
-  const encoded = encodeURIComponent(JSON.stringify({
-    url: channel.url,
-    name: channel.name,
-    referer: channel.referer,
-    userAgent: channel.userAgent,
-    logo: channel.logo,
-    group: channel.group,
-  }));
-
+function Spinner({ label }: { label: string }) {
   return (
-    <Link href={`/play?ch=${encoded}`}>
-      <div
-        onMouseEnter={() => setHovered(true)}
-        onMouseLeave={() => setHovered(false)}
-        style={{
-          background: hovered ? "var(--card-hover)" : "var(--bg)",
-          padding: "14px",
-          display: "flex",
-          alignItems: "center",
-          gap: "12px",
-          cursor: "pointer",
-          transition: "background 0.1s",
-          minHeight: "60px",
-        }}
-      >
-        <div style={{ width: "32px", height: "32px", flexShrink: 0, background: "var(--bg3)", borderRadius: "3px", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
-          {channel.logo
-            ? <img src={channel.logo} alt="" style={{ width: "100%", height: "100%", objectFit: "contain" }} onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
-            : <span style={{ fontSize: "12px" }}>📺</span>
-          }
-        </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <p style={{ fontSize: "11px", fontWeight: 600, color: hovered ? "var(--accent)" : "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-            {channel.name}
-          </p>
-          <p style={{ fontSize: "8px", color: "var(--text3)", letterSpacing: "0.1em", marginTop: "2px" }}>
-            HLS · NO DRM
-          </p>
-        </div>
-        <span style={{ fontSize: "14px", color: hovered ? "var(--accent)" : "var(--text3)", transition: "all 0.1s" }}>▶</span>
-      </div>
-    </Link>
+    <div style={{ padding: "60px 0", textAlign: "center" }}>
+      <div style={{ width: "24px", height: "24px", border: "2px solid var(--border2)", borderTop: "2px solid var(--accent)", borderRadius: "50%", animation: "spin 0.8s linear infinite", margin: "0 auto 12px" }} />
+      <p style={{ fontSize: "10px", color: "var(--text3)", letterSpacing: "0.2em" }}>{label}</p>
+    </div>
+  );
+}
+
+function ProviderGrid({ providers }: { providers: Provider[] }) {
+  if (providers.length === 0) return (
+    <p style={{ fontSize: "11px", color: "var(--text3)", textAlign: "center", padding: "40px" }}>No providers found</p>
+  );
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: "1px", background: "var(--border)", borderRadius: "4px", overflow: "hidden", border: "1px solid var(--border)" }}>
+      {providers.map(p => <ProviderCard key={p.catLink} provider={p} />)}
+    </div>
   );
 }
 
 function ProviderCard({ provider }: { provider: Provider }) {
   const [hovered, setHovered] = useState(false);
-  const encoded = encodeURIComponent(provider.catLink);
+  const url = `/watch?url=${encodeURIComponent(provider.catLink)}&name=${encodeURIComponent(provider.title)}`;
   return (
-    <Link href={`/watch?url=${encoded}&name=${encodeURIComponent(provider.title)}`}>
-      <div
-        onMouseEnter={() => setHovered(true)}
-        onMouseLeave={() => setHovered(false)}
-        style={{
-          background: hovered ? "var(--card-hover)" : "var(--bg)",
-          padding: "18px",
-          display: "flex",
-          alignItems: "center",
-          gap: "14px",
-          cursor: "pointer",
-          transition: "background 0.1s",
-          minHeight: "68px",
-        }}
-      >
+    <Link href={url}>
+      <div onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
+        style={{ background: hovered ? "var(--card-hover)" : "var(--bg)", padding: "18px", display: "flex", alignItems: "center", gap: "14px", cursor: "pointer", transition: "background 0.1s", minHeight: "68px" }}>
         <div style={{ width: "36px", height: "36px", flexShrink: 0, background: "var(--bg3)", borderRadius: "3px", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
           {provider.image
             ? <img src={provider.image} alt={provider.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
-            : <span style={{ fontSize: "14px", color: "var(--text3)" }}>▶</span>
-          }
+            : <span style={{ fontSize: "14px", color: "var(--text3)" }}>▶</span>}
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <p style={{ fontSize: "12px", fontWeight: 600, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{provider.title}</p>

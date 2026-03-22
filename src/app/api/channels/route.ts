@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
   try {
     const res = await fetch(url, {
       headers: CUSTOM_HEADERS,
-      next: { revalidate: 3600 },
+      next: { cache: "no-store" },
     });
 
     if (!res.ok) {
